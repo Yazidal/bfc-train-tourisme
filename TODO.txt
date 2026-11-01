@@ -1,0 +1,201 @@
+================================================================================
+ BFC TRAIN & TOURISME — TODO
+ Fichier : bfc-stations-map/TODO.txt
+ Mis à jour : 01/11/2026
+ Légende : [ ] à faire   [x] fait     S = < 2 h   M = ~1/2 journée   L = 1-2 j
+================================================================================
+
+DÉJÀ FAIT (ne pas refaire)
+--------------------------------------------------------------------------------
+[x] Carte plein écran type Google Maps, panneau latéral repliable
+[x] Périmètre BFC : filtre polygone au build + maxBounds sur la carte
+[x] 196 gares BFC, 1 039 communes, 15 089 POIs, 3 075 couples de durées
+[x] Recherche de trajet Départ / Destination (autocomplétion, swap, clear, GPS)
+[x] Clic carte : remplit départ, puis destination, puis sélectionne seulement
+[x] Temps de train : API SNCF -> GTFS -> estimation, méthode affichée
+[x] Itinéraires piéton / vélo (OSRM) + repli vol d'oiseau, moteur affiché
+[x] Zone atteignable approximative (enveloppe convexe des gares)
+[x] Photos Wikipédia/Commons (vignettes + galerie) + fiche détaillée modale
+[x] Filtres thèmes / accès / temps de train max / avis (données absentes -> off)
+[x] Liste paginée (20 par page), tri par distance, panneau défilant
+[x] POIs : IDs stables (hash), anti-doublons, sous-catégorie FR, 3,9 Mo
+[x] Accessibilité : combobox ARIA, modale focus-trap, focus-visible, aria-live
+[x] README (architecture, données, API SNCF, photos, limites)
+[x] node_modules retiré du suivi git + .gitignore
+
+
+P0 — AVANT DE PUBLIER (bloquants)
+--------------------------------------------------------------------------------
+[ ] Configurer le déploiement Vite                                        S
+    Fichier : vite.config.ts
+    Aujourd'hui : aucune option "base" -> sur GitHub Pages projet
+    (/bfc-train-tourisme/) les assets /assets/... casseront.
+    -> soit base: "/bfc-train-tourisme/"
+    -> soit héberger à la racine (Vercel / Netlify).
+
+[ ] Trancher le sort de dist/                                             S
+    dist/ est encore SUIVI par git (5 fichiers) et présent dans .gitignore.
+    -> option A : committer dist/ et publier Pages depuis la branche
+    -> option B : workflow GitHub Actions (npm ci && npm run build) + deploy
+
+[ ] Premier commit propre                                                 S
+    git add : public/data/pois.json (3,9 Mo), data/ (BFC.csv 7,6 Mo),
+    server/, src/features/trip/, src/features/filters/, src/features/pois/,
+    src/services/, src/domain/, src/map/, README.md, TODO.txt, .env.example
+    Vérifier qu'aucun .env ni node_modules n'entre.
+
+[ ] Déployer le proxy SNCF en production                                  M
+    Fichier : server/sncfProxy.ts (Vite middleware = dev/preview seulement)
+    Sur un hébergement statique /api/sncf/* renvoie 404 -> repli GTFS muet.
+    -> fonction serverless : api/sncf/journeys.ts + api/sncf/status.ts
+    -> SNCF_API_TOKEN en variable d'environnement (jamais côté client).
+
+[ ] Obtenir le jeton SNCF et activer le mode live (BLOQUÉ EXTERNE)         S
+    Portail SNCF en maintenance.
+    -> .env : SNCF_API_TOKEN=... / SNCF_API_MOCK=false
+    -> vérifier GET /api/sncf/status => mode: "live"
+    -> puis un trajet réel dans l'UI (badge "API SNCF connectée").
+
+[ ] Décider du sort des avis Google (BLOQUÉ EXTERNE)                      M
+    Sans data/ratings.csv le filtre "Avis" reste désactivé (assumé).
+    -> clé Google Places (facturée) ou export manuel + script de matching.
+
+[ ] Mentions légales et attribution                                        M
+    - Leaflet/OSM : "© OpenStreetMap" (présent) + lien dans l'UI
+    - Photos Commons : auteur + licence obligatoires. Aujourd'hui seul un
+      lien est affiché -> récupérer extmetadata (artist, license) et créditer.
+    - Page mentions légales / confidentialité si le site est public.
+
+
+P1 — FONCTIONNALITÉS MANQUANTES (cœur produit)
+--------------------------------------------------------------------------------
+[ ] État du trajet dans l'URL                                             M
+    Ex : /explore?depart=87713040&arrivee=87713545&mode=walk&themes=...&note=4
+    Aujourd'hui 100 % en useState : rechargement = trajet perdu, pas de partage.
+    -> react-router-dom ou history.replaceState maison.
+
+[ ] Partager un lieu / un trajet                                          S
+    Bouton "Partager" -> copie de l'URL (avec état) + toast de confirmation.
+
+[ ] Choisir la date et l'heure du trajet                                  M
+    L'API SNCF est appelée avec datetime = maintenant.
+    -> sélecteur (aujourd'hui / demain / date) -> param datetime côté proxy.
+
+[ ] Afficher les perturbations SNCF                                       M
+    Navitia renvoie status / disruptions par journey, non exploités.
+    -> badge "retard / perturbation" dans la liste des prochains départs.
+
+[ ] Correspondances (hors MVP, à trancher)                                L
+    Aujourd'hui max_nb_transfers=0 et filtre transfers === 0.
+    -> si activé : retirer la limite, afficher nb de changements + sections.
+
+[ ] Remplacer les POIs statiques par l'API DATAtourisme                    L
+    Fichier : src/services/pois.ts (seul point à modifier)
+    Aujourd'hui 3,9 Mo téléchargés en bloc au premier affichage de la carte.
+
+[ ] Import automatique des notes Google                                   M
+    data/ratings.csv attend l'id du POI (hash nom+coords) saisi à la main.
+    -> script de correspondance nom + coordonnées (fuzzy) -> id.
+
+[ ] Filtres supplémentaires                                               M
+    - tri : distance (fait) / note / nom
+    - "ouvert maintenant" : horaires absents de BFC.csv -> dépend de l'API
+    - rayon réglable (1 / 2 / 5 km)
+
+
+P2 — QUALITÉ, ROBUSTESSE, PERFORMANCE
+--------------------------------------------------------------------------------
+[ ] Tests automatiques (aucun aujourd'hui)                                M
+    Stack : vitest + @testing-library/react
+    - unitaires : lib/geo, lib/hull, services/train (ordre SNCF->GTFS->estimation),
+      services/ratings, scripts/prepare_data.py (dédoublonnage, IDs, filtre BFC)
+    - composants : TripPlanner (swap / clear / clavier), filtre rayon + thème
+    - proxy SNCF : mode mock / status / 400 sur UIC invalide
+
+[ ] Lint + format                                                         S
+    eslint (react-hooks, jsx-a11y) + prettier, script "npm run lint".
+
+[ ] CI GitHub Actions                                                     S
+    .github/workflows/ci.yml : npm ci, tsc --noEmit, lint, test, build.
+
+[ ] ErrorBoundary + page d'erreur                                         S
+    Aujourd'hui une exception React = écran blanc. Ajouter une limite
+    d'erreur racine avec message + bouton "recharger".
+
+[ ] Cache HTTP et compression du JSON                                     M
+    public/data/pois.json = 3,9 Mo. Vérifier les en-têtes de l'hébergeur,
+    viser Brotli (~800 Ko) ou découper le fichier par gare / zone.
+
+[ ] Clustering des marqueurs                                              M
+    Une gare urbaine peut afficher 200 POIs sur la carte.
+    -> leaflet.markercluster ou plafond "N lieux les plus proches".
+
+[ ] Robustesse réseau                                                     S
+    - timeouts / retry sur OSRM et Wikimedia (aujourd'hui catch silencieux)
+    - message si les tuiles OSM ne chargent pas
+    - AbortController partout (déjà sur SNCF et médias)
+
+[ ] Dates de fraîcheur des données                                        S
+    Afficher la date de l'export GTFS (feed_info.txt) et du CSV DATAtourisme
+    dans l'UI (footer) et dans le README.
+
+[ ] Audit accessibilité                                                   S
+    axe / Lighthouse : contrastes des badges, focus dans la modale,
+    ordre de tabulation du panneau, tailles de cibles tactiles.
+
+[ ] Meta / SEO                                                            S
+    index.html : meta description, Open Graph, theme-color, favicon.
+    (actuellement seul <title> est présent)
+
+
+P3 — CONFORT / SUITE
+--------------------------------------------------------------------------------
+[ ] Favoris (localStorage) + "mes trajets récents"
+[ ] Mode hors-ligne / PWA (utile en gare, réseau faible)
+[ ] Couches de POIs activables par thème (au lieu d'un filtre global)
+[ ] Comparaison train / voiture (hors périmètre SNCF)
+[ ] Statistiques d'usage respectueuses (Plausible / Umami) + bandeau RGPD
+[ ] Version anglaise (i18n) si ouverture touristique
+[ ] Écran "À propos" : sources, méthodes de calcul, limites
+
+
+ORDRE CONSEILLÉ
+--------------------------------------------------------------------------------
+SPRINT 1 — "ça se déploie"
+    1. base Vite + stratégie dist/
+    2. premier commit propre
+    3. proxy SNCF serverless
+    4. Lighthouse (perf + a11y)
+    => l'app est en ligne même sans jeton SNCF (repli GTFS assumé)
+
+SPRINT 2 — "c'est robuste"
+    1. état dans l'URL (partage / retour arrière)
+    2. tests + lint + CI
+    3. ErrorBoundary
+    4. clustering + en-têtes de cache
+    5. crédits photos (auteur + licence)
+
+PLUS TARD — dépend de jetons / API externes
+    - jeton SNCF (portail indisponible) -> date/heure + perturbations
+    - clé Google Places ou export -> avis
+    - API DATAtourisme -> POIs à la demande
+    - correspondances (décision produit)
+
+
+DÉPENDANCES EXTERNES À OBTENIR
+--------------------------------------------------------------------------------
+[ ] Jeton API SNCF / Navitia (api.sncf.com) -> mode live
+[ ] Clé Google Places (facturée) OU export d'avis -> data/ratings.csv
+[ ] Accès API DATAtourisme -> remplacement de pois.json
+[ ] (Option) Hébergement avec fonctions serverless : Vercel / Netlify /
+    Cloudflare -> nécessaire pour le proxy SNCF en production
+
+
+COMMANDES UTILES
+--------------------------------------------------------------------------------
+npm run dev                 serveur local + proxy SNCF (http://localhost:5173)
+npm run build               tsc --noEmit + build dans dist/
+npm run data:build          régénère public/data (GTFS + data/BFC.csv)
+SNCF_API_MOCK=true npm run dev    horaires simulés (sans jeton)
+VITE_RATINGS_MOCK=true npm run dev    avis simulés (démo du filtre)
+
