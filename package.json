@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "sync-stations": "python3 ../extract_bfc.py && python3 scripts/sync_stations.py",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "data:build": "python3 scripts/prepare_data.py",
+    "durations:build": "python3 scripts/build_durations.py"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
